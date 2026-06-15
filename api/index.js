@@ -1,17 +1,31 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import express from 'express';
+import cors from 'cors';
+import pg from 'pg';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+// --- Environment setup ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load backend/.env first (has DATABASE_URL for local dev)
+dotenv.config({ path: path.resolve(__dirname, '..', 'backend', '.env') });
+// Also load root .env (won't overwrite existing vars)
+dotenv.config();
+
+const { Pool } = pg;
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// --- Database connection ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
@@ -20,7 +34,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
+
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
@@ -34,6 +48,11 @@ const authenticateToken = (req, res, next) => {
 
 app.post('/api/auth/signup', async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
   try {
     const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
@@ -53,15 +72,20 @@ app.post('/api/auth/signup', async (req, res) => {
       [userId]
     );
 
-    res.json({ error: null });
+    res.status(200).json({ error: null });
   } catch (error) {
-    console.error(error);
+    console.error('Signup error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
   try {
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
@@ -74,11 +98,10 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user.id, email: user.email } });
+    res.status(200).json({ token, user: { id: user.id, email: user.email } });
   } catch (error) {
-    console.error(error);
+    console.error('Login error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -87,7 +110,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const userResult = await pool.query('SELECT id, email FROM users WHERE id = $1', [req.user.id]);
     const profileResult = await pool.query('SELECT * FROM profiles WHERE user_id = $1', [req.user.id]);
-    
+
     if (userResult.rows.length === 0 || profileResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
@@ -95,7 +118,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
     const user = userResult.rows[0];
     const profile = profileResult.rows[0];
 
-    res.json({
+    res.status(200).json({
       success: true,
       user: {
         id: user.id,
@@ -107,7 +130,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(error);
+    console.error('Auth/me error:', error);
     res.status(500).json({ success: false, error: 'Internal Server Error' });
   }
 });
@@ -117,17 +140,18 @@ app.get('/api/auth/status', async (req, res) => {
   try {
     const result = await pool.query('SELECT is_verified FROM users WHERE email = $1', [email]);
     if (result.rows.length > 0) {
-      res.json({ isVerified: result.rows[0].is_verified });
+      res.status(200).json({ isVerified: result.rows[0].is_verified });
     } else {
-      res.json({ isVerified: false });
+      res.status(200).json({ isVerified: false });
     }
   } catch (error) {
+    console.error('Status error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 });
 
 app.post('/api/auth/resend', async (req, res) => {
-  res.json({ error: null }); // Mock implementation for resend email
+  res.status(200).json({ error: null }); // Mock implementation for resend email
 });
 
 
@@ -144,7 +168,7 @@ app.put('/api/profiles/me', authenticateToken, async (req, res) => {
     );
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error(error);
+    console.error('Profile update error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -153,11 +177,12 @@ app.get('/api/profiles/onboarding', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT onboarding_complete FROM profiles WHERE user_id = $1', [req.user.id]);
     if (result.rows.length > 0) {
-      res.json({ onboardingComplete: result.rows[0].onboarding_complete });
+      res.status(200).json({ onboardingComplete: result.rows[0].onboarding_complete });
     } else {
-      res.json({ onboardingComplete: false });
+      res.status(200).json({ onboardingComplete: false });
     }
   } catch (error) {
+    console.error('Onboarding get error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -167,6 +192,7 @@ app.post('/api/profiles/onboarding', authenticateToken, async (req, res) => {
     await pool.query('UPDATE profiles SET onboarding_complete = TRUE WHERE user_id = $1', [req.user.id]);
     res.status(200).json({ success: true });
   } catch (error) {
+    console.error('Onboarding set error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -174,16 +200,14 @@ app.post('/api/profiles/onboarding', authenticateToken, async (req, res) => {
 app.post('/api/records/:qrId', async (req, res) => {
   const { qrId } = req.params;
   const { patientRecord, privacySettings } = req.body;
-  
-  // In a real app, you would locate the user by checking if patient_record->>'qrId' matches.
-  // For this simplified version we assume the patientRecord json is just passed to update.
+
   try {
     // Find profile by qrId using jsonb search
     const result = await pool.query(
       `SELECT user_id FROM profiles WHERE patient_record->>'qrId' = $1`,
       [qrId]
     );
-    
+
     if (result.rows.length > 0) {
       const userId = result.rows[0].user_id;
       await pool.query(
@@ -191,19 +215,23 @@ app.post('/api/records/:qrId', async (req, res) => {
         [patientRecord, privacySettings, userId]
       );
     }
-    
+
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error(error);
+    console.error('Records error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
+// --- Start server for local development ---
 const PORT = process.env.PORT || 5000;
-if (require.main === module) {
+
+// Only start listening when running directly (not on Vercel)
+if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
 }
 
-module.exports = app;
+// Export for Vercel serverless function
+export default app;
