@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import jsQR from 'jsqr';
 import QRCode from 'qrcode';
 import { Button } from '../components/Button';
-import type { PatientRecord, PrivacySettings } from '../context/AuthContext';
+import type { PatientRecord, PrivacySettings } from '../types';
 
 // Define Custom Document interface for Dhoni's documents
 interface DhoniDocument {

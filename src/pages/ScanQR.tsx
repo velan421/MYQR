@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import type { PatientRecord, PrivacySettings } from '../context/AuthContext';
+import type { PatientRecord, PrivacySettings } from '../types';
 
 export const ScanQR: React.FC = () => {
   const { user } = useAuth();
