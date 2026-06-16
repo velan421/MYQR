@@ -1,18 +1,13 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-// --- Environment setup ---
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 // Load backend/.env first (has DATABASE_URL for local dev)
-dotenv.config({ path: path.resolve(__dirname, '..', 'backend', '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), 'backend', '.env') });
 // Also load root .env (won't overwrite existing vars)
 dotenv.config();
 
