@@ -22,10 +22,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Add a simple middleware to ensure req.body is at least an object
+app.use((req, res, next) => {
+  if (!req.body) req.body = {};
+  next();
+});
+
 // --- Database connection ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
+});
+
+// Prevent Node crashes on idle client errors
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
@@ -46,8 +57,8 @@ const authenticateToken = (req, res, next) => {
 
 // --- AUTH ENDPOINTS ---
 
-app.post('/api/auth/signup', async (req, res) => {
-  const { email, password } = req.body;
+app.post('/api/auth/signup', async (req, res, next) => {
+  const { email, password } = req.body || {};
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
@@ -79,8 +90,8 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+app.post('/api/auth/login', async (req, res, next) => {
+  const { email, password } = req.body || {};
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
@@ -221,6 +232,12 @@ app.post('/api/records/:qrId', async (req, res) => {
     console.error('Records error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
+});
+
+// Global error handler to ensure JSON responses and prevent HTML 500 pages
+app.use((err, req, res, next) => {
+  console.error('Global unhandled error:', err);
+  res.status(500).json({ error: 'Internal Server Error', details: err.message });
 });
 
 // --- Start server for local development ---

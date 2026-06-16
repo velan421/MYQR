@@ -176,7 +176,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
-      const data = await response.json();
+      
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        data = { error: 'Server returned an invalid response. Please try again later.' };
+      }
       
       if (!response.ok) {
         return { error: data.error || 'Signup connection error' };
@@ -208,7 +214,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({ email }),
       });
       
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        data = { error: 'Server returned an invalid response. Please try again later.' };
+      }
+      
       if (!response.ok) {
         return { error: data.error || 'Resend link error' };
       }
@@ -248,7 +260,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
-      const data = await response.json();
+      
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        data = { error: 'Server returned an invalid response. Please try again later.' };
+      }
 
       if (!response.ok) {
         if (data.error === 'EMAIL_NOT_VERIFIED') {
