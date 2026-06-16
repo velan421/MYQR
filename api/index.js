@@ -24,15 +24,20 @@ app.use((req, res, next) => {
 });
 
 // --- Database connection ---
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
-});
+let pool;
+try {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
+  });
 
-// Prevent Node crashes on idle client errors
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-});
+  // Prevent Node crashes on idle client errors
+  pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+  });
+} catch (e) {
+  console.error('Failed to initialize pg Pool. Check DATABASE_URL:', e);
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 
@@ -53,6 +58,7 @@ const authenticateToken = (req, res, next) => {
 // --- AUTH ENDPOINTS ---
 
 app.post('/api/auth/signup', async (req, res, next) => {
+  if (!pool) return res.status(500).json({ error: 'Database connection not initialized. Check server logs or DATABASE_URL.' });
   const { email, password } = req.body || {};
 
   if (!email || !password) {
@@ -86,6 +92,7 @@ app.post('/api/auth/signup', async (req, res, next) => {
 });
 
 app.post('/api/auth/login', async (req, res, next) => {
+  if (!pool) return res.status(500).json({ error: 'Database connection not initialized. Check server logs or DATABASE_URL.' });
   const { email, password } = req.body || {};
 
   if (!email || !password) {
@@ -113,6 +120,7 @@ app.post('/api/auth/login', async (req, res, next) => {
 });
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  if (!pool) return res.status(500).json({ success: false, error: 'Database connection not initialized.' });
   try {
     const userResult = await pool.query('SELECT id, email FROM users WHERE id = $1', [req.user.id]);
     const profileResult = await pool.query('SELECT * FROM profiles WHERE user_id = $1', [req.user.id]);
@@ -142,6 +150,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/auth/status', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'Database connection not initialized.' });
   const email = req.query.email;
   try {
     const result = await pool.query('SELECT is_verified FROM users WHERE email = $1', [email]);
@@ -164,6 +173,7 @@ app.post('/api/auth/resend', async (req, res) => {
 // --- PROFILE ENDPOINTS ---
 
 app.put('/api/profiles/me', authenticateToken, async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'Database connection not initialized.' });
   const { phone, patientRecord, privacySettings, notifications } = req.body;
   try {
     await pool.query(
@@ -180,6 +190,7 @@ app.put('/api/profiles/me', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/profiles/onboarding', authenticateToken, async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'Database connection not initialized.' });
   try {
     const result = await pool.query('SELECT onboarding_complete FROM profiles WHERE user_id = $1', [req.user.id]);
     if (result.rows.length > 0) {
@@ -194,6 +205,7 @@ app.get('/api/profiles/onboarding', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/profiles/onboarding', authenticateToken, async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'Database connection not initialized.' });
   try {
     await pool.query('UPDATE profiles SET onboarding_complete = TRUE WHERE user_id = $1', [req.user.id]);
     res.status(200).json({ success: true });
@@ -204,6 +216,7 @@ app.post('/api/profiles/onboarding', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/records/:qrId', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'Database connection not initialized.' });
   const { qrId } = req.params;
   const { patientRecord, privacySettings } = req.body;
 
